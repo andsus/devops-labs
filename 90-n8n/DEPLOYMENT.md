@@ -9,10 +9,15 @@
 
 ```bash
 cd /Users/SUSANAX5/workplace/train/devops-labs/90-n8n
+
+# Install CNPG CRDs first
+kubectl apply --server-side -f https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.24/releases/cnpg-1.24.0.yaml
+
+# Deploy via ArgoCD
 kubectl apply -f argocd/cnpg-operator-application.yaml
 
 # Wait for operator
-kubectl wait --for=condition=available --timeout=300s deployment/cnpg-cloudnative-pg -n cnpg-system
+kubectl wait --for=condition=available --timeout=300s deployment/cnpg-operator-cloudnative-pg -n cnpg-system
 ```
 
 ## 2. Generate Sealed Secrets
