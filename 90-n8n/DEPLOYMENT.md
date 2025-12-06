@@ -43,7 +43,15 @@ kubectl get pods -n cnpg-dev
 kubectl apply -f argocd/applicationset.yaml
 
 # Check deployment
-kubectl get applications -n argocd | grep n8n
 kubectl get pods -n n8n-dev
 kubectl get svc -n n8n-dev
+```
+
+## 5. Access n8n
+
+```bash
+# Port forward
+kubectl port-forward -n n8n-dev svc/n8n 5678:80
+
+# Open browser: http://localhost:5678
 ```
