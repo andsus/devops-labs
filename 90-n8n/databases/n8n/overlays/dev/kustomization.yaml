@@ -3,5 +3,5 @@ namespace: cnpg-dev
 resources:
   - ../../base
   - namespace.yaml
-  - secrets.yaml
-  - scheduled-backup.yaml
+  - sealed-secrets.yaml
+  # - scheduled-backup.yaml  # Requires backup config

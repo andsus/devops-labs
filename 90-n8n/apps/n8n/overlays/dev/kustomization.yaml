@@ -3,4 +3,4 @@ namespace: n8n-dev
 resources:
   - ../../base
   - namespace.yaml
-  - secrets.yaml
+  - sealed-secrets.yaml

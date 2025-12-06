@@ -5,7 +5,7 @@ metadata:
 spec:
   generators:
     - git:
-        repoURL: https://github.com/aminrj/devops-labs.git
+        repoURL: https://github.com/andsus/devops-labs.git
         revision: main
         directories:
           - path: 90-n8n/databases/*/overlays/*
@@ -15,7 +15,7 @@ spec:
     spec:
       project: default
       source:
-        repoURL: https://github.com/aminrj/devops-labs.git
+        repoURL: https://github.com/andsus/devops-labs.git
         targetRevision: main
         # path: "{{path}}"
         path: '90-n8n/databases/{{path[2]}}/overlays/{{path[4]}}'

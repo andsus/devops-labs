@@ -30,18 +30,18 @@ spec:
     requests:
       memory: 600Mi
 
-  backup:
-    barmanObjectStore:
-      destinationPath: https://n8nsa1234.blob.core.windows.net/n8n-db
-      azureCredentials:
-        storageAccount:
-          name: n8n-db-storage
-          key: container-name
-        storageSasToken:
-          name: n8n-db-storage
-          key: blob-sas
-      wal:
-        compression: gzip
-      data:
-        compression: gzip
-    retentionPolicy: 14d
+  # backup:
+  #   barmanObjectStore:
+  #     destinationPath: https://n8nsa1234.blob.core.windows.net/n8n-db
+  #     azureCredentials:
+  #       storageAccount:
+  #         name: n8n-db-storage
+  #         key: container-name
+  #       storageSasToken:
+  #         name: n8n-db-storage
+  #         key: blob-sas
+  #     wal:
+  #       compression: gzip
+  #     data:
+  #       compression: gzip
+  #   retentionPolicy: 14d
