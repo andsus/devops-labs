@@ -12,21 +12,21 @@ kubectl create secret generic n8n-db-secret \
   --from-literal=username=n8n \
   --from-literal=password="$DB_PASSWORD" \
   --namespace=n8n-dev --dry-run=client -o yaml | \
-  kubeseal -o yaml > apps/n8n/overlays/dev/sealed-secrets.yaml
+  kubeseal --controller-name=sealed-secrets-controller --controller-namespace=kube-system -o yaml > apps/n8n/overlays/dev/sealed-secrets.yaml
 
 echo "---" >> apps/n8n/overlays/dev/sealed-secrets.yaml
 
 kubectl create secret generic n8n-encryption \
   --from-literal=key="$ENCRYPTION_KEY" \
   --namespace=n8n-dev --dry-run=client -o yaml | \
-  kubeseal -o yaml >> apps/n8n/overlays/dev/sealed-secrets.yaml
+  kubeseal --controller-name=sealed-secrets-controller --controller-namespace=kube-system -o yaml >> apps/n8n/overlays/dev/sealed-secrets.yaml
 
 # Database secrets (same password)
 kubectl create secret generic n8n-db-creds \
   --from-literal=username=n8n \
   --from-literal=password="$DB_PASSWORD" \
   --namespace=cnpg-dev --dry-run=client -o yaml | \
-  kubeseal -o yaml > databases/n8n/overlays/dev/sealed-secrets.yaml
+  kubeseal --controller-name=sealed-secrets-controller --controller-namespace=kube-system -o yaml > databases/n8n/overlays/dev/sealed-secrets.yaml
 
 echo "Done! Secrets generated."
 echo "DB_PASSWORD: $DB_PASSWORD"
