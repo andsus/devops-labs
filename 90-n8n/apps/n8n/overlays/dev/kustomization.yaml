@@ -4,3 +4,10 @@ resources:
   - ../../base
   - namespace.yaml
   - sealed-secrets.yaml
+
+
+patches:
+  - path: patch-securitycontext.yaml
+    target:
+      kind: Deployment
+      name: n8n

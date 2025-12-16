@@ -1,0 +1,14 @@
+
+# 90-n8n/apps/n8n/overlays/dev/patch-securitycontext.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: n8n-dev           # ← must match your actual Deployment name
+spec:
+  template:
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
