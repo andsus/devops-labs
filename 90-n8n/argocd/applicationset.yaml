@@ -1,27 +1,50 @@
+
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
   name: apps
+  namespace: argocd
 spec:
+  # Use Go templates (recommended)
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+
   generators:
     - git:
         repoURL: https://github.com/andsus/devops-labs.git
         revision: main
         directories:
           - path: 90-n8n/apps/*/overlays/*
+
   template:
     metadata:
-      name: '{{path[2]}}-{{path[4]}}' # example: commafeed-dev, listmonk-qa...
+      # e.g., commafeed-dev, listmonk-qa
+      name: '{{ index .path.segments 2 }}-{{ index .path.segments 4 }}'
+      labels:
+        app.kubernetes.io/part-of: apps
+        app.kubernetes.io/name: '{{ index .path.segments 2 }}'
+        app.kubernetes.io/environment: '{{ index .path.segments 4 }}'
+      annotations:
+        apps.argocd.io/source-path: '{{ .path.path }}'
+
     spec:
       project: default
+
       source:
         repoURL: https://github.com/andsus/devops-labs.git
         targetRevision: main
-        path: '90-n8n/apps/{{path[2]}}/overlays/{{path[4]}}' #Example: apps/nextjs-app/dev
+        # Always use the full generator-provided path
+        path: '{{ .path.path }}'  # e.g., 90-n8n/apps/<app>/overlays/<env>
+
       destination:
         server: https://kubernetes.default.svc
-        namespace: '{{path[4]}}' # dev, qa, prod as namespace (simpler - for now)
-      # syncPolicy:
-      #   automated:
-      #     prune: true
-      #     selfHeal: true
+        namespace: '{{ index .path.segments 4 }}'  # dev/qa/prod
+
+      # Optional: enable namespace creation; uncomment automation when ready
+      syncPolicy:
+        syncOptions:
+          - CreateNamespace=true
+        # automated:
+        #   prune: true
+        #   selfHeal: true
