@@ -4,5 +4,5 @@ namespace: cnpg-qa
 resources:
   - ../../base
   - namespace.yaml
-  - secrets.yaml
+  - sealed-secrets.yaml
   - scheduled-backup.yaml

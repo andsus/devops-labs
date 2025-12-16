@@ -1,0 +1,6 @@
+namespace: n8n-qa
+
+resources:
+  - ../../base
+  - namespace.yaml
+  - sealed-secrets.yaml
