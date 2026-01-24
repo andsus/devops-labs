@@ -1,0 +1,25 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: exit-handler-
+spec:
+  entrypoint: main
+  templates:
+    - name: main
+      dag:
+        tasks:
+          - name: a
+            template: echo
+            onExit: tidy-up
+
+    - name: echo
+      container:
+        image: busybox
+        command: [echo]
+        args: ["hello world"]
+
+    - name: tidy-up
+      container:
+        image: busybox
+        command: [echo]
+        args: ["tidy up!"]

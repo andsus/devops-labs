@@ -1,0 +1,28 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: with-sequence-
+spec:
+  entrypoint: main
+  templates:
+    - name: main
+      dag:
+        tasks:
+          - name: print-message
+            template: echo
+            arguments:
+              parameters:
+                - name: message
+                  value: "{{item}}"
+            withSequence:
+              start: 10
+              end: 15
+
+    - name: echo
+      inputs:
+        parameters:
+          - name: message
+      container:
+        image: busybox
+        command: [echo]
+        args: ["{{inputs.parameters.message}}"]
