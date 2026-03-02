@@ -10,9 +10,18 @@
 
 set -e
 
-NAMESPACE="${NAMESPACE:-argo-workflows}"
+NAMESPACE="${NAMESPACE:-argoworkflows}"
 WORKFLOWS_HOST="${WORKFLOWS_HOST:-workflows.upandrunning.local}"
 ARGO_VERSION="${ARGO_VERSION:-v3.5.4}"
+
+# Cross-platform sed in-place edit
+sed_inplace() {
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        sed -i '' "$@"
+    else
+        sed -i "$@"
+    fi
+}
 
 echo "================================================"
 echo "  Argo Workflows Setup"
@@ -47,7 +56,7 @@ kubectl create namespace "${NAMESPACE}" --dry-run=client -o yaml | kubectl apply
 echo "Patching manifest to use namespace '${NAMESPACE}'..."
 # Replace 'namespace: argo' with the custom namespace
 # This handles the case where resources have a hardcoded namespace
-sed -i '' "s/namespace: argo/namespace: ${NAMESPACE}/g" "${TEMP_MANIFEST}"
+sed_inplace "s/namespace: argo/namespace: ${NAMESPACE}/g" "${TEMP_MANIFEST}"
 
 echo "Applying patched manifest..."
 kubectl apply -n "${NAMESPACE}" -f "${TEMP_MANIFEST}"
