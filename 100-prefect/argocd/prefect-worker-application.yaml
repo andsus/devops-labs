@@ -39,8 +39,6 @@ spec:
           selfHostedServerApiConfig:
             # Internal cluster DNS — worker talks directly to the service, not via ingress
             apiUrl: http://prefect-server.prefect.svc.cluster.local:4200/api
-          # Worker type: submits flows as Kubernetes Jobs
-          type: kubernetes
           replicaCount: 1
           resources:
             requests:

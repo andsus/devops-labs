@@ -135,7 +135,8 @@ spec:
         ingress:
           enabled: true
           className: nginx
-          host: prefect.upandrunning.local
+          host:
+            hostname: prefect.upandrunning.local
           annotations:
             nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
             nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
