@@ -47,9 +47,34 @@ Repository 'git@github.com:andsus/devops-labs.git' added
 > **Note**: If you get a `knownhosts: key is unknown` error, add GitHub's SSH host key first:
 > ```bash
 > ssh-keyscan github.com | argocd cert add-ssh --batch
-> ```
+### 3. Generate the Sealed Secret
 
-### 3. Commit and push the manifests
+If you ever need to change the database password, follow these steps to regenerate the sealed secret:
+
+1. Create a file named `100-prefect/secrets/secret-template.yaml` (this file is already ignored by git):
+   ```yaml
+   apiVersion: v1
+   kind: Secret
+   metadata:
+     name: prefect-db-secret
+     namespace: prefect
+   type: Opaque
+   stringData:
+     password: "your-db-password"
+     connection-url: "postgresql+asyncpg://prefect:your-db-password@postgresql.prefect.svc.cluster.local:5432/prefect"
+   ```
+
+2. Run `kubeseal` to encrypt the secret (ensure the sealed-secrets controller is running in the cluster):
+   ```bash
+   kubeseal --format=yaml \
+     --controller-name=sealed-secrets \
+     --controller-namespace=kube-system \
+     < 100-prefect/secrets/secret-template.yaml > 100-prefect/secrets/prefect-db-sealedsecret.yaml
+   ```
+
+   *(Note: Only the encrypted `prefect-db-sealedsecret.yaml` file should be committed to version control.)*
+
+### 4. Commit and push the manifests
 
 Make sure to add `.gitignore` so your raw secrets are never committed:
 
