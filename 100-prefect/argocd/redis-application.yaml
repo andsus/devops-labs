@@ -23,6 +23,8 @@ spec:
     targetRevision: "19.x.x"
     helm:
       values: |
+        image:
+          repository: bitnamilegacy/redis
         architecture: standalone    # single instance for lab; use replication for prod
         auth:
           enabled: false            # no auth for local lab; enable + use secret for prod

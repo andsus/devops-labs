@@ -22,6 +22,8 @@ spec:
     targetRevision: "15.x.x"    # PostgreSQL 14.9+ server version
     helm:
       values: |
+        image:
+          repository: bitnamilegacy/postgresql
         auth:
           username: prefect
           database: prefect
