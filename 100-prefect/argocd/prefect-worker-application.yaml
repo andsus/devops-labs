@@ -1,0 +1,67 @@
+# =============================================================================
+# Prefect Worker — Kubernetes work pool for running flows on the cluster
+# =============================================================================
+# The worker polls the Prefect Server API for scheduled runs and submits
+# them as Kubernetes Jobs in the 'prefect' namespace.
+#
+# Work pool name: kube-work-pool
+# Worker type:    kubernetes  (runs flows as K8s Jobs)
+#
+# To run a flow using this worker:
+#   1. Point your Prefect client at the server:
+#      export PREFECT_API_URL=http://prefect.upandrunning.local/api
+#   2. Create the work pool (first time only):
+#      prefect work-pool create kube-work-pool --type kubernetes
+#   3. Deploy and run your flow:
+#      prefect deploy myflow.py:my_flow --name my-deployment \
+#        --pool kube-work-pool
+#      prefect deployment run my-flow/my-deployment
+# =============================================================================
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: prefect-worker
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: prefect
+spec:
+  project: default
+  source:
+    repoURL: https://prefecthq.github.io/prefect-helm
+    chart: prefect-worker
+    targetRevision: "*"          # pin to a specific release for stability
+    helm:
+      values: |
+        worker:
+          apiConfig: selfHostedServer
+          config:
+            workPool: kube-work-pool
+          selfHostedServerApiConfig:
+            # Internal cluster DNS — worker talks directly to the service, not via ingress
+            apiUrl: http://prefect-server.prefect.svc.cluster.local:4200/api
+          # Worker type: submits flows as Kubernetes Jobs
+          type: kubernetes
+          replicaCount: 1
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
+
+        # RBAC: the worker needs permission to create/watch/delete K8s Jobs
+        serviceAccount:
+          create: true
+        rbac:
+          create: true
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: prefect
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

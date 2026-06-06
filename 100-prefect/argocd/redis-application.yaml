@@ -1,0 +1,48 @@
+# =============================================================================
+# Redis — Prefect event messaging, causal ordering & docket coordination
+# =============================================================================
+# Redis is REQUIRED for HA (multi-instance) Prefect Server:
+#   - PREFECT_MESSAGING_BROKER     → inter-service event bus
+#   - PREFECT_MESSAGING_CACHE      → deduplication cache
+#   - PREFECT_SERVER_EVENTS_CAUSAL_ORDERING → ordered event delivery
+#   - PREFECT_SERVER_CONCURRENCY_LEASE_STORAGE → concurrency limits
+#   - PREFECT_SERVER_DOCKET_URL    → background job coordination
+# =============================================================================
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: prefect-redis
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: prefect
+spec:
+  project: default
+  source:
+    repoURL: https://charts.bitnami.com/bitnami
+    chart: redis
+    targetRevision: "19.x.x"
+    helm:
+      values: |
+        architecture: standalone    # single instance for lab; use replication for prod
+        auth:
+          enabled: false            # no auth for local lab; enable + use secret for prod
+        master:
+          persistence:
+            enabled: true
+            size: 2Gi
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: prefect
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

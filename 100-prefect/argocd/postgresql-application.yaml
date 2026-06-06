@@ -1,0 +1,50 @@
+# =============================================================================
+# PostgreSQL — Prefect backend database
+# =============================================================================
+# Bitnami PostgreSQL 14+ is required for multi-instance Prefect HA.
+# This ArgoCD Application deploys it into the 'prefect' namespace.
+#
+# IMPORTANT: The password here is for local lab use only.
+# In production, replace with a SealedSecret reference.
+# =============================================================================
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: prefect-postgresql
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: prefect
+spec:
+  project: default
+  source:
+    repoURL: https://charts.bitnami.com/bitnami
+    chart: postgresql
+    targetRevision: "15.x.x"    # PostgreSQL 14.9+ server version
+    helm:
+      values: |
+        auth:
+          username: prefect
+          database: prefect
+          existingSecret: prefect-db-secret
+        primary:
+          persistence:
+            enabled: true
+            size: 5Gi
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+        readReplicas:
+          replicaCount: 0        # single primary for lab; add replicas for prod
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: prefect
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

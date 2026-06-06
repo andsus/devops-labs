@@ -1,0 +1,157 @@
+# =============================================================================
+# Prefect Server — HA (2 API replicas + 2 background service replicas)
+# =============================================================================
+# Architecture (from docs.prefect.io/v3/advanced/self-hosted):
+#   - prefect-server pods  → handle UI + API requests (--no-services flag)
+#   - prefect-background pods → scheduler, automation triggers, loop services
+#   - PostgreSQL           → persistent state & cross-server sync
+#   - Redis                → event messaging & Docket job coordination
+#   - NGINX Ingress        → routes prefect.upandrunning.local → service:4200
+#
+# Service DNS inside the cluster (used by the worker):
+#   http://prefect-server.prefect.svc.cluster.local:4200/api
+#
+# Prerequisites (must be Synced & Healthy before applying this):
+#   - prefect-postgresql
+#   - prefect-redis
+# =============================================================================
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: prefect-server
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: prefect
+spec:
+  project: default
+  source:
+    repoURL: https://prefecthq.github.io/prefect-helm
+    chart: prefect-server
+    targetRevision: "*"          # pin to a specific release (e.g. "2025.6.5") for stability
+    helm:
+      values: |
+        # ── API server replicas ────────────────────────────────────────────
+        server:
+          replicaCount: 2
+          # Run API only; background services run in the separate deployment below
+          extraArgs:
+            - "--no-services"
+          env:
+            # ── Database ──────────────────────────────────────────────────
+            - name: PREFECT_API_DATABASE_CONNECTION_URL
+              valueFrom:
+                secretKeyRef:
+                  name: prefect-db-secret
+                  key: connection-url
+            # Disable auto-migration (the migration job handles it before server starts)
+            - name: PREFECT_API_DATABASE_MIGRATE_ON_START
+              value: "false"
+            # ── Redis messaging ───────────────────────────────────────────
+            - name: PREFECT_MESSAGING_BROKER
+              value: "prefect_redis.messaging"
+            - name: PREFECT_MESSAGING_CACHE
+              value: "prefect_redis.messaging"
+            - name: PREFECT_SERVER_EVENTS_CAUSAL_ORDERING
+              value: "prefect_redis.ordering"
+            - name: PREFECT_SERVER_CONCURRENCY_LEASE_STORAGE
+              value: "prefect_redis.lease_storage"
+            - name: PREFECT_REDIS_MESSAGING_HOST
+              value: "redis-master.prefect.svc.cluster.local"
+            - name: PREFECT_REDIS_MESSAGING_PORT
+              value: "6379"
+            - name: PREFECT_REDIS_MESSAGING_DB
+              value: "0"
+            # ── Docket (background job coordination via Redis DB 1) ───────
+            - name: PREFECT_SERVER_DOCKET_URL
+              value: "redis://redis-master.prefect.svc.cluster.local:6379/1"
+            # ── UI proxy settings ─────────────────────────────────────────
+            - name: PREFECT_UI_API_URL
+              value: "http://prefect.upandrunning.local/api"
+            - name: PREFECT_UI_URL
+              value: "http://prefect.upandrunning.local"
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+
+        # ── Background services replicas ───────────────────────────────────
+        # The prefect-helm chart exposes a separate backgroundService section
+        # for the scheduler/automation/loop service processes.
+        backgroundService:
+          enabled: true
+          replicaCount: 2
+          env:
+            - name: PREFECT_API_DATABASE_CONNECTION_URL
+              valueFrom:
+                secretKeyRef:
+                  name: prefect-db-secret
+                  key: connection-url
+            - name: PREFECT_API_DATABASE_MIGRATE_ON_START
+              value: "false"
+            - name: PREFECT_MESSAGING_BROKER
+              value: "prefect_redis.messaging"
+            - name: PREFECT_MESSAGING_CACHE
+              value: "prefect_redis.messaging"
+            - name: PREFECT_SERVER_EVENTS_CAUSAL_ORDERING
+              value: "prefect_redis.ordering"
+            - name: PREFECT_SERVER_CONCURRENCY_LEASE_STORAGE
+              value: "prefect_redis.lease_storage"
+            - name: PREFECT_REDIS_MESSAGING_HOST
+              value: "redis-master.prefect.svc.cluster.local"
+            - name: PREFECT_REDIS_MESSAGING_PORT
+              value: "6379"
+            - name: PREFECT_REDIS_MESSAGING_DB
+              value: "0"
+            - name: PREFECT_SERVER_DOCKET_URL
+              value: "redis://redis-master.prefect.svc.cluster.local:6379/1"
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
+
+        # ── Database migration job ─────────────────────────────────────────
+        # Runs `prefect server database upgrade -y` once before the server starts.
+        # Must complete successfully before server pods become healthy.
+        migrations:
+          enabled: true
+          env:
+            - name: PREFECT_API_DATABASE_CONNECTION_URL
+              valueFrom:
+                secretKeyRef:
+                  name: prefect-db-secret
+                  key: connection-url
+
+        # ── Bundled PostgreSQL disabled (using external prefect-postgresql app) ──
+        postgresql:
+          enabled: false
+
+        # ── Ingress via NGINX (TLS terminated at ingress layer) ────────────
+        ingress:
+          enabled: true
+          className: nginx
+          host: prefect.upandrunning.local
+          annotations:
+            nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+            nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+            nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+            # WebSocket support for the UI live updates
+            nginx.ingress.kubernetes.io/proxy-http-version: "1.1"
+            nginx.ingress.kubernetes.io/configuration-snippet: |
+              proxy_set_header Upgrade $http_upgrade;
+              proxy_set_header Connection "upgrade";
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: prefect
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
