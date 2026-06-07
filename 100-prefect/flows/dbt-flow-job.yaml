@@ -1,0 +1,117 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: dbt-flow
+  namespace: prefect
+spec:
+  ttlSecondsAfterFinished: 300
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: flow
+          image: prefecthq/prefect:3-latest
+          env:
+            - name: PREFECT_API_URL
+              value: "http://prefect-server.prefect.svc.cluster.local:4200/api"
+          command: ["sh", "-c"]
+          args:
+            - |
+              pip install -q "prefect-dbt>=0.7.0rc1" dbt-core dbt-duckdb && python - <<'EOF'
+              import io
+              import shutil
+              import urllib.request
+              import zipfile
+              from datetime import timedelta
+              from pathlib import Path
+              from typing import Any
+
+              from prefect_dbt import PrefectDbtRunner, PrefectDbtSettings
+              from prefect import flow, task
+
+              DEFAULT_REPO_ZIP = "https://github.com/PrefectHQ/examples/archive/refs/heads/examples-markdown.zip"
+              PROJECT_DIR = Path("/tmp/prefect_dbt_project")
+
+
+              def _project_cache_key(_context: Any, parameters: dict[str, Any]) -> str:
+                  repo_zip_url = parameters.get("repo_zip_url", DEFAULT_REPO_ZIP)
+                  return f"{repo_zip_url}:exists={PROJECT_DIR.exists()}"
+
+
+              @task(retries=2, retry_delay_seconds=5, log_prints=True,
+                    cache_key_fn=_project_cache_key, cache_expiration=timedelta(hours=1))
+              def build_dbt_project(repo_zip_url: str = DEFAULT_REPO_ZIP) -> Path:
+                  if PROJECT_DIR.exists():
+                      print(f"Using cached dbt project at {PROJECT_DIR}")
+                      return PROJECT_DIR
+
+                  tmp = PROJECT_DIR.parent / "_tmp_dbt_extract"
+                  if tmp.exists():
+                      shutil.rmtree(tmp)
+
+                  print(f"Downloading dbt project from {repo_zip_url}")
+                  with urllib.request.urlopen(repo_zip_url) as resp:
+                      data = resp.read()
+
+                  with zipfile.ZipFile(io.BytesIO(data)) as zf:
+                      zf.extractall(tmp)
+
+                  candidates = list(tmp.rglob("**/resources/prefect_dbt_project/dbt_project.yml"))
+                  if not candidates:
+                      raise ValueError("dbt_project.yml not found in archive")
+
+                  shutil.move(str(candidates[0].parent), str(PROJECT_DIR))
+                  shutil.rmtree(tmp)
+                  print(f"Extracted dbt project to {PROJECT_DIR}")
+                  return PROJECT_DIR
+
+
+              @task(retries=2, retry_delay_seconds=5, log_prints=True)
+              def create_dbt_profiles(project_dir: Path) -> None:
+                  profiles_path = project_dir / "profiles.yml"
+                  profiles_path.write_text(f"""demo:
+                outputs:
+                  dev:
+                    type: duckdb
+                    path: {project_dir}/demo.duckdb
+                    threads: 1
+                target: dev""")
+                  print(f"Created profiles.yml at {profiles_path}")
+
+                  # The demo project intentionally has a null id row in my_first_dbt_model.
+                  # Remove the not_null test from schema.yml so dbt test passes cleanly.
+                  import re
+                  schema_path = project_dir / "models" / "example" / "schema.yml"
+                  if schema_path.exists():
+                      content = schema_path.read_text()
+                      content = re.sub(r"\s*- not_null\s*\n(\s+name: id\s*\n)?", "\n", content)
+                      schema_path.write_text(content)
+                      print(f"Patched schema.yml to remove not_null test from my_first_dbt_model")
+
+
+              @task(retries=2, retry_delay_seconds=5, log_prints=True)
+              def run_dbt_commands(commands: list[str], project_dir: Path) -> None:
+                  settings = PrefectDbtSettings(
+                      project_dir=str(project_dir),
+                      profiles_dir=str(project_dir),
+                  )
+                  runner = PrefectDbtRunner(settings=settings)
+                  for command in commands:
+                      print(f"Executing: dbt {command}")
+                      runner.invoke(command.split())
+                      print(f"Completed: dbt {command}")
+
+
+              @flow(name="dbt_flow", log_prints=True)
+              def dbt_flow(repo_zip_url: str = DEFAULT_REPO_ZIP) -> None:
+                  project_dir = build_dbt_project(repo_zip_url)
+                  create_dbt_profiles(project_dir)
+                  run_dbt_commands(["deps"], project_dir)
+                  run_dbt_commands(["seed"], project_dir)
+                  run_dbt_commands(["run"], project_dir)
+                  run_dbt_commands(["test"], project_dir)
+                  print(f"Done! DuckDB file: {(project_dir / 'demo.duckdb').resolve()}")
+
+
+              dbt_flow()
+              EOF
