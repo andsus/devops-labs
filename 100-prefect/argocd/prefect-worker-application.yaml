@@ -24,6 +24,8 @@ metadata:
   namespace: argocd
   labels:
     app.kubernetes.io/part-of: prefect
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
 spec:
   project: default
   source:
