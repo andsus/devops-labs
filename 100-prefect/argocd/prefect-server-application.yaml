@@ -127,9 +127,10 @@ spec:
                   name: prefect-db-secret
                   key: connection-url
 
-        # ── Chart-managed secret disabled (connection URL is in prefect-db-secret) ──
+        # ── Point chart secret to existing prefect-db-secret (key: connection-string) ──
         secret:
           create: false
+          name: prefect-db-secret
 
         # ── Bundled PostgreSQL disabled (using external prefect-postgresql app) ──
         postgresql:
