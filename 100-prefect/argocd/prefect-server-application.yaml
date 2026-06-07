@@ -56,14 +56,14 @@ spec:
             - name: PREFECT_SERVER_CONCURRENCY_LEASE_STORAGE
               value: "prefect_redis.lease_storage"
             - name: PREFECT_REDIS_MESSAGING_HOST
-              value: "redis-master.prefect.svc.cluster.local"
+              value: "prefect-redis-master.prefect.svc.cluster.local"
             - name: PREFECT_REDIS_MESSAGING_PORT
               value: "6379"
             - name: PREFECT_REDIS_MESSAGING_DB
               value: "0"
             # ── Docket (background job coordination via Redis DB 1) ───────
             - name: PREFECT_SERVER_DOCKET_URL
-              value: "redis://redis-master.prefect.svc.cluster.local:6379/1"
+              value: "redis://prefect-redis-master.prefect.svc.cluster.local:6379/1"
             # ── UI proxy settings ─────────────────────────────────────────
             - name: PREFECT_UI_API_URL
               value: "http://prefect.upandrunning.local/api"
@@ -100,13 +100,13 @@ spec:
             - name: PREFECT_SERVER_CONCURRENCY_LEASE_STORAGE
               value: "prefect_redis.lease_storage"
             - name: PREFECT_REDIS_MESSAGING_HOST
-              value: "redis-master.prefect.svc.cluster.local"
+              value: "prefect-redis-master.prefect.svc.cluster.local"
             - name: PREFECT_REDIS_MESSAGING_PORT
               value: "6379"
             - name: PREFECT_REDIS_MESSAGING_DB
               value: "0"
             - name: PREFECT_SERVER_DOCKET_URL
-              value: "redis://redis-master.prefect.svc.cluster.local:6379/1"
+              value: "redis://prefect-redis-master.prefect.svc.cluster.local:6379/1"
           resources:
             requests:
               cpu: 50m
