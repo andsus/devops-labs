@@ -1,0 +1,142 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ai-analyst-flow
+  namespace: prefect
+spec:
+  ttlSecondsAfterFinished: 300
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: flow
+          image: prefecthq/prefect:3-latest
+          env:
+            - name: PREFECT_API_URL
+              value: "http://prefect-server.prefect.svc.cluster.local:4200/api"
+            # From SealedSecret — sensitive
+            - name: OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: prefect-ai-secret
+                  key: OPENAI_API_KEY
+            # From ConfigMap — non-sensitive tunables
+            - name: MODEL
+              valueFrom:
+                configMapKeyRef:
+                  name: prefect-ai-config
+                  key: MODEL
+            - name: LLM_RETRIES
+              valueFrom:
+                configMapKeyRef:
+                  name: prefect-ai-config
+                  key: LLM_RETRIES
+            - name: LLM_TIMEOUT
+              valueFrom:
+                configMapKeyRef:
+                  name: prefect-ai-config
+                  key: LLM_TIMEOUT
+            - name: TOOL_RETRIES
+              valueFrom:
+                configMapKeyRef:
+                  name: prefect-ai-config
+                  key: TOOL_RETRIES
+          command: ["sh", "-c"]
+          args:
+            - |
+              pip install -q "pydantic-ai[prefect]" pandas && python - <<'EOF'
+              from __future__ import annotations
+              import asyncio
+              import os
+              from typing import Any
+
+              import pandas as pd
+              from pydantic import BaseModel, Field
+              from pydantic_ai import Agent, RunContext
+              from pydantic_ai.durable_exec.prefect import PrefectAgent, TaskConfig
+              from prefect import flow, task
+
+
+              def calculate_statistics(ctx: RunContext[pd.DataFrame], column: str) -> dict[str, Any]:
+                  df = ctx.deps
+                  if column not in df.columns:
+                      return {"error": f"Column '{column}' not found. Available: {list(df.columns)}"}
+                  stats = df[column].describe().to_dict()
+                  stats["missing_count"] = int(df[column].isna().sum())
+                  stats["unique_count"] = int(df[column].nunique())
+                  return {k: (float(v) if isinstance(v, (int, float)) else v) for k, v in stats.items()}
+
+
+              def detect_anomalies(ctx: RunContext[pd.DataFrame], column: str, threshold: float = 3.0) -> list[dict[str, Any]]:
+                  df = ctx.deps
+                  if column not in df.columns:
+                      return [{"error": f"Column '{column}' not found"}]
+                  if not pd.api.types.is_numeric_dtype(df[column]):
+                      return [{"error": f"Column '{column}' is not numeric"}]
+                  mean, std = df[column].mean(), df[column].std()
+                  if std == 0:
+                      return []
+                  anomalies = df[abs(df[column] - mean) > (threshold * std)]
+                  return [{"index": int(idx), "value": float(row[column]), "z_score": float((row[column] - mean) / std)}
+                          for idx, row in anomalies.head(10).iterrows()]
+
+
+              def get_column_info(ctx: RunContext[pd.DataFrame]) -> dict[str, Any]:
+                  df = ctx.deps
+                  return {"columns": list(df.columns), "shape": {"rows": len(df), "columns": len(df.columns)},
+                          "dtypes": {col: str(dtype) for col, dtype in df.dtypes.items()}}
+
+
+              class DataAnalysis(BaseModel):
+                  summary: str = Field(description="High-level summary of the dataset")
+                  key_findings: list[str] = Field(description="Key findings", min_length=3, max_length=5)
+                  recommendations: list[str] = Field(description="Actionable recommendations", min_length=3, max_length=5)
+                  columns_analyzed: list[str] = Field(description="Columns that were analyzed")
+
+                  def __str__(self) -> str:
+                      findings = "\n".join(f"  {i}. {f}" for i, f in enumerate(self.key_findings, 1))
+                      recs = "\n".join(f"  {i}. {r}" for i, r in enumerate(self.recommendations, 1))
+                      return f"\n{'='*60}\nANALYSIS RESULTS\n{'='*60}\n\nSummary:\n{self.summary}\n\nKey Findings:\n{findings}\n\nRecommendations:\n{recs}\n\nColumns Analyzed: {', '.join(self.columns_analyzed)}\n{'='*60}"
+
+
+              @task
+              def create_sample_dataset() -> pd.DataFrame:
+                  data = {
+                      "product": ["Widget", "Gadget", "Doohickey", "Widget", "Gadget"] * 20,
+                      "sales": [100, 150, 200, 110, 145] * 19 + [100, 150, 200, 1000, 2000],
+                      "region": ["North", "South", "East", "West", "Central"] * 20,
+                      "month": [1, 2, 3, 4, 5] * 20,
+                  }
+                  return pd.DataFrame(data)
+
+
+              @flow(name="ai-data-analyst", log_prints=True)
+              async def analyze_dataset_with_ai() -> DataAnalysis:
+                  model    = os.getenv("MODEL", "openai:gpt-4o")
+                  llm_ret  = int(os.getenv("LLM_RETRIES", "3"))
+                  llm_to   = float(os.getenv("LLM_TIMEOUT", "60"))
+                  tool_ret = int(os.getenv("TOOL_RETRIES", "2"))
+
+                  print(f"Model: {model} | LLM retries: {llm_ret} | timeout: {llm_to}s | tool retries: {tool_ret}")
+
+                  df = create_sample_dataset()
+                  print(f"Dataset shape: {df.shape}")
+
+                  agent = PrefectAgent(
+                      Agent(model, name="data-analyst-agent", output_type=DataAnalysis,
+                            deps_type=pd.DataFrame, tools=[calculate_statistics, detect_anomalies, get_column_info],
+                            system_prompt="You are an expert data analyst. Always start by calling get_column_info."),
+                      model_task_config=TaskConfig(retries=llm_ret, retry_delay_seconds=[1.0, 2.0, 4.0], timeout_seconds=llm_to),
+                      tool_task_config=TaskConfig(retries=tool_ret, retry_delay_seconds=[0.5, 1.0]),
+                  )
+
+                  result = await agent.run(
+                      "Analyze this sales dataset. Identify patterns, anomalies, and provide recommendations.",
+                      deps=df,
+                  )
+                  print(result.output)
+                  return result.output
+
+
+              asyncio.run(analyze_dataset_with_ai())
+              EOF
