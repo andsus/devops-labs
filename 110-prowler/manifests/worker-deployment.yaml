@@ -55,6 +55,10 @@ spec:
         app: prowler-worker-beat
     spec:
       terminationGracePeriodSeconds: 120
+      initContainers:
+        - name: wait-for-api
+          image: busybox:1.37.0
+          command: ['sh', '-c', 'until wget -q -O /dev/null http://prowler-api:8080/health/live; do echo waiting for api; sleep 5; done']
       containers:
         - name: worker-beat
           image: prowlercloud/prowler-api:stable
