@@ -21,21 +21,40 @@ spec:
             - containerPort: 7474
             - containerPort: 7687
           env:
-            - name: _NEO4J_USER
+            - name: NEO4J_USER
               valueFrom:
                 secretKeyRef:
                   name: prowler-secret
                   key: NEO4J_USER
-            - name: _NEO4J_PASSWORD
+            - name: NEO4J_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: prowler-secret
                   key: NEO4J_PASSWORD
             - name: NEO4J_AUTH
-              value: "$(_NEO4J_USER)/$(_NEO4J_PASSWORD)"
-          envFrom:
-            - configMapRef:
-                name: prowler-config
+              value: "$(NEO4J_USER)/$(NEO4J_PASSWORD)"
+            - name: NEO4J_dbms_max__databases
+              value: "1000"
+            - name: NEO4J_server_memory_pagecache__size
+              value: "512M"
+            - name: NEO4J_server_memory_heap_initial__size
+              value: "512M"
+            - name: NEO4J_server_memory_heap_max__size
+              value: "512M"
+            - name: NEO4J_PLUGINS
+              value: '["apoc"]'
+            - name: NEO4J_dbms_security_procedures_allowlist
+              value: "apoc.*"
+            - name: apoc_export_file_enabled
+              value: "false"
+            - name: apoc_import_file_enabled
+              value: "false"
+            - name: apoc_import_file_use__neo4j__config
+              value: "true"
+            - name: apoc_trigger_enabled
+              value: "false"
+            - name: NEO4J_server_config_strict__validation_enabled
+              value: "false"
           resources:
             requests:
               cpu: 250m
@@ -44,9 +63,8 @@ spec:
               cpu: 1000m
               memory: 2Gi
           livenessProbe:
-            httpGet:
-              path: /
-              port: 7474
+            tcpSocket:
+              port: 7687
             initialDelaySeconds: 60
             periodSeconds: 30
             failureThreshold: 5
