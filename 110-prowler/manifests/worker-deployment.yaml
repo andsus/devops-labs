@@ -37,8 +37,7 @@ spec:
               mountPath: /tmp/prowler_api_output
       volumes:
         - name: output
-          persistentVolumeClaim:
-            claimName: prowler-output
+          emptyDir: {}
 ---
 apiVersion: apps/v1
 kind: Deployment
