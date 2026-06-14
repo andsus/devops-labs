@@ -1,0 +1,27 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: prowler-stack
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: prowler
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/andsus/devops-labs.git
+    targetRevision: main
+    path: 110-prowler/argocd
+    directory:
+      recurse: false
+      exclude: prowler-app-of-apps.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

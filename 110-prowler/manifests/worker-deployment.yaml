@@ -1,0 +1,74 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prowler-worker
+  namespace: prowler
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prowler-worker
+  template:
+    metadata:
+      labels:
+        app: prowler-worker
+    spec:
+      terminationGracePeriodSeconds: 120
+      containers:
+        - name: worker
+          image: prowlercloud/prowler-api:stable
+          command: ["/home/prowler/docker-entrypoint.sh", "worker"]
+          envFrom:
+            - configMapRef:
+                name: prowler-config
+            - secretRef:
+                name: prowler-secret
+          resources:
+            requests:
+              cpu: 200m
+              memory: 512Mi
+            limits:
+              cpu: 1000m
+              memory: 2Gi
+          securityContext:
+            sysctls: []
+          volumeMounts:
+            - name: output
+              mountPath: /tmp/prowler_api_output
+      volumes:
+        - name: output
+          persistentVolumeClaim:
+            claimName: prowler-output
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prowler-worker-beat
+  namespace: prowler
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prowler-worker-beat
+  template:
+    metadata:
+      labels:
+        app: prowler-worker-beat
+    spec:
+      terminationGracePeriodSeconds: 120
+      containers:
+        - name: worker-beat
+          image: prowlercloud/prowler-api:stable
+          command: ["/home/prowler/docker-entrypoint.sh", "beat"]
+          envFrom:
+            - configMapRef:
+                name: prowler-config
+            - secretRef:
+                name: prowler-secret
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi

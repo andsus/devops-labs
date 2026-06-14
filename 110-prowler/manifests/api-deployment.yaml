@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prowler-api
+  namespace: prowler
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prowler-api
+  template:
+    metadata:
+      labels:
+        app: prowler-api
+    spec:
+      initContainers:
+        - name: chown-data
+          image: busybox:1.37.0
+          command: ["sh", "-c", "chown -R 1000:1000 /data"]
+          volumeMounts:
+            - name: output
+              mountPath: /data
+      containers:
+        - name: api
+          image: prowlercloud/prowler-api:stable
+          command: ["/home/prowler/docker-entrypoint.sh", "prod"]
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: prowler-config
+            - secretRef:
+                name: prowler-secret
+          resources:
+            requests:
+              cpu: 200m
+              memory: 512Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: 8080
+            initialDelaySeconds: 60
+            periodSeconds: 15
+            failureThreshold: 12
+          readinessProbe:
+            httpGet:
+              path: /health/live
+              port: 8080
+            initialDelaySeconds: 60
+            periodSeconds: 10
+            failureThreshold: 6
+          volumeMounts:
+            - name: output
+              mountPath: /tmp/prowler_api_output
+      volumes:
+        - name: output
+          persistentVolumeClaim:
+            claimName: prowler-output

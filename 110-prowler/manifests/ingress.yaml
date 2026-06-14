@@ -1,0 +1,31 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: prowler
+  namespace: prowler
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-body-size: "100m"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: prowler.upandrunning.local
+      http:
+        paths:
+          # API — must come before / to take priority
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: prowler-api
+                port:
+                  number: 8080
+          # UI — catch-all
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: prowler-ui
+                port:
+                  number: 3000

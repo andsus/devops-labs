@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prowler-ui
+  namespace: prowler
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prowler-ui
+  template:
+    metadata:
+      labels:
+        app: prowler-ui
+    spec:
+      containers:
+        - name: ui
+          image: prowlercloud/prowler-ui:stable
+          ports:
+            - containerPort: 3000
+          envFrom:
+            - configMapRef:
+                name: prowler-config
+            - secretRef:
+                name: prowler-secret
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 3000
+            initialDelaySeconds: 60
+            periodSeconds: 15
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 3000
+            initialDelaySeconds: 60
+            periodSeconds: 10
+            failureThreshold: 3

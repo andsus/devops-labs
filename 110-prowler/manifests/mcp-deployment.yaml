@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prowler-mcp
+  namespace: prowler
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prowler-mcp
+  template:
+    metadata:
+      labels:
+        app: prowler-mcp
+    spec:
+      containers:
+        - name: mcp
+          image: prowlercloud/prowler-mcp:stable
+          command: ["uvicorn", "--host", "0.0.0.0", "--port", "8000"]
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - configMapRef:
+                name: prowler-config
+            - secretRef:
+                name: prowler-secret
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 3

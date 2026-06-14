@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: prowler-neo4j
+  namespace: prowler
+spec:
+  serviceName: prowler-neo4j
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prowler-neo4j
+  template:
+    metadata:
+      labels:
+        app: prowler-neo4j
+    spec:
+      containers:
+        - name: neo4j
+          image: graphstack/dozerdb:5.26.3.0
+          ports:
+            - containerPort: 7474
+            - containerPort: 7687
+          env:
+            - name: _NEO4J_USER
+              valueFrom:
+                secretKeyRef:
+                  name: prowler-secret
+                  key: NEO4J_USER
+            - name: _NEO4J_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: prowler-secret
+                  key: NEO4J_PASSWORD
+            - name: NEO4J_AUTH
+              value: "$(_NEO4J_USER)/$(_NEO4J_PASSWORD)"
+          envFrom:
+            - configMapRef:
+                name: prowler-config
+          resources:
+            requests:
+              cpu: 250m
+              memory: 1Gi
+            limits:
+              cpu: 1000m
+              memory: 2Gi
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 7474
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            failureThreshold: 5
+          volumeMounts:
+            - name: data
+              mountPath: /data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: prowler-neo4j-data

@@ -1,0 +1,48 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: prowler-postgresql
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: prowler
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://charts.bitnami.com/bitnami
+    chart: postgresql
+    targetRevision: "15.x.x"
+    helm:
+      values: |
+        image:
+          repository: bitnamilegacy/postgresql
+        auth:
+          username: prowler
+          database: prowler_db
+          existingSecret: prowler-secret
+          secretKeys:
+            adminPasswordKey: POSTGRES_ADMIN_PASSWORD
+            userPasswordKey: POSTGRES_PASSWORD
+        primary:
+          persistence:
+            enabled: true
+            size: 10Gi
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+        readReplicas:
+          replicaCount: 0
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: prowler
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
