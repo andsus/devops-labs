@@ -30,8 +30,6 @@ spec:
             limits:
               cpu: 1000m
               memory: 3Gi
-          securityContext:
-            sysctls: []
           volumeMounts:
             - name: output
               mountPath: /tmp/prowler_api_output
