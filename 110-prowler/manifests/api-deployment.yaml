@@ -26,6 +26,9 @@ spec:
           command: ["/home/prowler/docker-entrypoint.sh", "prod"]
           ports:
             - containerPort: 8080
+          env:
+            - name: GUNICORN_CMD_ARGS
+              value: "--timeout 180 --graceful-timeout 180"
           envFrom:
             - configMapRef:
                 name: prowler-config
@@ -34,23 +37,41 @@ spec:
           resources:
             requests:
               cpu: 500m
-              memory: 2Gi
+              memory: 5Gi
             limits:
               cpu: 2000m
-              memory: 4Gi
+              memory: 8Gi
+          startupProbe:
+            httpGet:
+              path: /health/live
+              port: 8080
+              httpHeaders:
+                - name: Host
+                  value: prowler-api
+            periodSeconds: 10
+            timeoutSeconds: 120
+            failureThreshold: 36
           livenessProbe:
             httpGet:
               path: /health/live
               port: 8080
-            initialDelaySeconds: 60
+              httpHeaders:
+                - name: Host
+                  value: prowler-api
+            initialDelaySeconds: 120
             periodSeconds: 15
+            timeoutSeconds: 30
             failureThreshold: 12
           readinessProbe:
             httpGet:
               path: /health/live
               port: 8080
-            initialDelaySeconds: 60
+              httpHeaders:
+                - name: Host
+                  value: prowler-api
+            initialDelaySeconds: 120
             periodSeconds: 10
+            timeoutSeconds: 30
             failureThreshold: 6
           volumeMounts:
             - name: output
