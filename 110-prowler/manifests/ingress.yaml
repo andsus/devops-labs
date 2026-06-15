@@ -13,6 +13,14 @@ spec:
     - host: prowler.upandrunning.local
       http:
         paths:
+          # UI auth — NextAuth routes live in the Next.js UI
+          - path: /api/auth
+            pathType: Prefix
+            backend:
+              service:
+                name: prowler-ui
+                port:
+                  number: 3000
           # API — must come before / to take priority
           - path: /api
             pathType: Prefix

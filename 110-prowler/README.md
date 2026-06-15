@@ -285,7 +285,14 @@ Django rejects unknown hosts. Kubelet HTTP probes often arrive with a pod-IP Hos
 header, causing HTTP 400. The probes set `Host: prowler-api`, which is already in
 `DJANGO_ALLOWED_HOSTS`.
 
-### 6. Worker-beat waits for API
+### 6. UI auth routes must stay on the UI service
+
+The UI uses NextAuth under `/api/auth/*`. The ingress must route `/api/auth` to
+`prowler-ui` before the broader `/api` rule sends API traffic to `prowler-api`.
+If `/api/auth/session` reaches Django, login pages show auth/session errors and the
+API logs show `GET /api/auth/session` returning 404.
+
+### 7. Worker-beat waits for API
 
 `prowler-worker-beat` has an init container that polls `http://prowler-api:8080/health/live`.
 If the API is not Ready, beat remains in `Init:0/1`.
