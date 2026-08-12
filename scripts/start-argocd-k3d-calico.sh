@@ -21,6 +21,9 @@ echo ""
 echo "[1/6] Starting k3d cluster..."
 k3d cluster start "$CLUSTER_NAME"
 
+echo "   Switching kubectl context to k3d-${CLUSTER_NAME}..."
+kubectl config use-context "k3d-${CLUSTER_NAME}"
+
 # Wait for nodes to be ready
 echo ""
 echo "[2/6] Waiting for nodes to be ready..."

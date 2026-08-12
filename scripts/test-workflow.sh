@@ -5,7 +5,7 @@
 
 set -e
 
-NAMESPACE="${NAMESPACE:-argo-workflows}"
+NAMESPACE="${NAMESPACE:-argoworkflows}"
 WORKFLOW_FILE="$(dirname "$0")/../examples/git-test-workflow.yaml"
 
 echo "================================================"

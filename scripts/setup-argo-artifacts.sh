@@ -5,7 +5,7 @@
 
 set -e
 
-NAMESPACE="${NAMESPACE:-argo-workflows}"
+NAMESPACE="${NAMESPACE:-argoworkflows}"
 MINIO_ACCESS_KEY="admin"
 MINIO_SECRET_KEY="password"
 BUCKET_NAME="my-bucket"

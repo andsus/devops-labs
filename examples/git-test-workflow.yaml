@@ -1,0 +1,20 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: git-clone-test-
+  namespace: argoworkflows
+spec:
+  entrypoint: main
+  templates:
+  - name: main
+    inputs:
+      artifacts:
+      - name: repo
+        path: /src
+        git:
+          repo: https://github.com/argoproj/argo-workflows.git
+          revision: main
+    container:
+      image: alpine:latest
+      command: [sh, -c]
+      args: ["ls -R /src | head -n 20"]
